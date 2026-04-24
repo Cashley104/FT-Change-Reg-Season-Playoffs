@@ -12,6 +12,7 @@ const searchFilter = document.getElementById('search-filter');
 const combineFilter = document.getElementById('combine-filter');
 const summaryCards = document.getElementById('summary-cards');
 const statusBanner = document.getElementById('status-banner');
+const controls = document.getElementById('controls');
 const explainToggle = document.getElementById('explain-toggle');
 const explainPanel = document.getElementById('explain-panel');
 const explainTitle = document.getElementById('explain-title');
@@ -885,6 +886,7 @@ function showActiveTab() {
   rankFilterWrap.hidden = hideRankFilter;
   rankFilter.disabled = hideRankFilter;
   rankFilter.title = hideRankFilter ? 'Top N only applies to separate-season player tabs.' : '';
+  controls.classList.toggle('is-rank-hidden', hideRankFilter);
 }
 
 function rerender() {
