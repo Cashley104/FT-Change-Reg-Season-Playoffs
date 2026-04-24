@@ -880,9 +880,11 @@ function showActiveTab() {
     panel.classList.toggle('is-active', isActive);
   });
   const isCombined = combineFilter.value === 'combined';
-  rankFilterWrap.hidden = isCombined;
-  rankFilter.disabled = isCombined;
-  rankFilter.title = isCombined ? 'Top N is hidden in combined mode.' : '';
+  const isPlayerTab = ['risers', 'droppers', 'risers-rate', 'droppers-rate'].includes(activeTab);
+  const hideRankFilter = isCombined || !isPlayerTab;
+  rankFilterWrap.hidden = hideRankFilter;
+  rankFilter.disabled = hideRankFilter;
+  rankFilter.title = hideRankFilter ? 'Top N only applies to separate-season player tabs.' : '';
 }
 
 function rerender() {
