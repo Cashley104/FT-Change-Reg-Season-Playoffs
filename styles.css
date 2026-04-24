@@ -123,11 +123,13 @@ h1 {
 }
 
 .controls.is-team-tab {
-  grid-template-columns: 92px 92px minmax(260px, 1fr) 220px;
+  grid-template-columns: 92px 92px minmax(160px, 220px) 104px minmax(190px, 240px);
+  justify-content: space-between;
 }
 
 .controls.is-run-tab {
-  grid-template-columns: 92px 92px minmax(320px, 1fr);
+  grid-template-columns: 92px 92px minmax(180px, 240px);
+  justify-content: space-between;
 }
 
 .control {

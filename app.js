@@ -513,10 +513,12 @@ function currentRunRows() {
 function currentTeamRateRows() {
   const { start, end } = currentSeasonBounds();
   const team = teamFilter.value;
+  const minPoGames = Number(poGamesFilter.value || 0);
   const rows = teamRateRows.filter((row) => {
     const matchesSeason = row.season >= start && row.season <= end;
     const matchesTeam = !team || row.team_abbr === team;
-    return matchesSeason && matchesTeam;
+    const matchesPoGames = (row.playoff_games ?? 0) >= minPoGames;
+    return matchesSeason && matchesTeam && matchesPoGames;
   });
 
   if (combineFilter.value !== 'combined') return rows;
@@ -888,15 +890,15 @@ function showActiveTab() {
   const isTeamTab = activeTab === 'teams';
   const isRunTab = activeTab === 'runs';
   const hideRankFilter = isCombined || !isPlayerTab;
-  const hidePlayerFilters = !isPlayerTab;
+  const showPoGamesFilter = isPlayerTab || isTeamTab;
   const hideModeFilter = isRunTab;
   rankFilterWrap.hidden = hideRankFilter;
   rankFilter.disabled = hideRankFilter;
   rankFilter.title = hideRankFilter ? 'Top N only applies to separate-season player tabs.' : '';
-  poGamesFilterWrap.hidden = hidePlayerFilters;
-  poGamesFilter.disabled = hidePlayerFilters;
-  searchFilterWrap.hidden = hidePlayerFilters;
-  searchFilter.disabled = hidePlayerFilters;
+  poGamesFilterWrap.hidden = !showPoGamesFilter;
+  poGamesFilter.disabled = !showPoGamesFilter;
+  searchFilterWrap.hidden = !isPlayerTab;
+  searchFilter.disabled = !isPlayerTab;
   modeFilterWrap.hidden = hideModeFilter;
   combineFilter.disabled = hideModeFilter;
   controls.classList.toggle('is-rank-hidden', hideRankFilter);
