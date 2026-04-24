@@ -30,8 +30,25 @@ let championRuns = [];
 let teamRateRows = [];
 let seasonYears = [];
 let activeTab = 'risers';
-let teamSortDirection = 'desc';
-let runSortDirection = 'desc';
+const defaultTableSorts = {
+  'risers-table': { key: 'fta_per_g_change', direction: 'desc', type: 'number' },
+  'droppers-table': { key: 'fta_per_g_change', direction: 'asc', type: 'number' },
+  'risers-rate-table': { key: 'fta_rate_change', direction: 'desc', type: 'number' },
+  'droppers-rate-table': { key: 'fta_rate_change', direction: 'asc', type: 'number' },
+  'team-table': { key: 'net_ft_rate_swing', direction: 'desc', type: 'number' },
+  'runs-table': { key: 'net_ft_rate_edge', direction: 'desc', type: 'number' },
+};
+const tabTableIds = {
+  risers: 'risers-table',
+  droppers: 'droppers-table',
+  'risers-rate': 'risers-rate-table',
+  'droppers-rate': 'droppers-rate-table',
+  teams: 'team-table',
+  runs: 'runs-table',
+};
+const tableSorts = Object.fromEntries(
+  Object.entries(defaultTableSorts).map(([tableId, sort]) => [tableId, { ...sort }]),
+);
 
 function setStatus(message, tone = 'info') {
   if (!message) {
@@ -311,13 +328,13 @@ function renderExplanation() {
 function activeRows() {
   const { start, end } = currentSeasonBounds();
   const team = teamFilter.value;
-  const maxRank = Number(rankFilter.value || 5);
+  const maxRank = rankFilter.value ? Number(rankFilter.value) : null;
   const search = searchFilter.value.trim().toLowerCase();
 
   return playerRows.filter((row) => {
     const matchesSeason = row.season >= start && row.season <= end;
     const matchesTeam = !team || row.team === team;
-    const matchesRank = combineFilter.value === 'combined' || (row.team_fta_rank !== null && row.team_fta_rank <= maxRank);
+    const matchesRank = maxRank === null || (row.team_fta_rank !== null && row.team_fta_rank <= maxRank);
     const matchesSearch = !search || String(row.player).toLowerCase().includes(search);
     return matchesSeason && matchesTeam && matchesRank && matchesSearch;
   });
@@ -388,6 +405,8 @@ function aggregateRows(rows) {
     reg_fga_per_g: group.reg_games_sum > 0 ? group.reg_fga_weighted_sum / group.reg_games_sum : null,
     po_fga_per_g: group.po_games_sum > 0 ? group.po_fga_weighted_sum / group.po_games_sum : null,
     fta_change_minus_fga_change: group.fta_change_minus_fga_change_sum / group.seasons_played,
+    reg_fta_rate: group.reg_games_sum > 0 ? group.reg_fta_rate_weighted_sum / group.reg_games_sum : null,
+    po_fta_rate: group.po_games_sum > 0 ? group.po_fta_rate_weighted_sum / group.po_games_sum : null,
     fta_rate_change: (group.po_games_sum > 0 && group.reg_games_sum > 0)
       ? (group.po_fta_rate_weighted_sum / group.po_games_sum) - (group.reg_fta_rate_weighted_sum / group.reg_games_sum)
       : null,
@@ -711,47 +730,101 @@ function renderCards(rows) {
   `).join('');
 }
 
-function renderPlayerTable(tableId, rows, sortKey, direction = 'desc', viewType = 'raw') {
+function sortValue(row, column) {
+  if (typeof column.value === 'function') return column.value(row);
+  return row[column.key];
+}
+
+function compareValues(a, b, type) {
+  if (type === 'number') {
+    const left = num(a);
+    const right = num(b);
+    return left - right;
+  }
+
+  return String(a ?? '').localeCompare(String(b ?? ''), undefined, {
+    numeric: true,
+    sensitivity: 'base',
+  });
+}
+
+function sortedRowsForTable(tableId, rows, columns) {
+  const sort = tableSorts[tableId];
+  const column = columns.find((item) => item.key === sort.key);
+  if (!column) return rows.slice();
+
+  return rows
+    .slice()
+    .sort((a, b) => {
+      const left = sortValue(a, column);
+      const right = sortValue(b, column);
+      const leftBlank = sort.type === 'number' ? num(left) === null : String(left ?? '') === '';
+      const rightBlank = sort.type === 'number' ? num(right) === null : String(right ?? '') === '';
+      if (leftBlank && rightBlank) return 0;
+      if (leftBlank) return 1;
+      if (rightBlank) return -1;
+
+      const result = compareValues(left, right, sort.type);
+      return sort.direction === 'desc' ? -result : result;
+    });
+}
+
+function sortableHeader(tableId, column) {
+  return `<th><button class="sort-button" type="button" data-sort-table="${tableId}" data-sort-key="${column.key}" data-sort-type="${column.type}">${column.label}</button></th>`;
+}
+
+function renderTableHead(table, tableId, columns) {
+  table.querySelector('thead').innerHTML = `<tr>${columns.map((column) => sortableHeader(tableId, column)).join('')}</tr>`;
+}
+
+function setTableSort(tableId, key, type) {
+  const current = tableSorts[tableId] || { key, direction: 'asc', type };
+  tableSorts[tableId] = {
+    key,
+    type,
+    direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+  };
+}
+
+function resetTableSortForTab(tabId) {
+  const tableId = tabTableIds[tabId];
+  if (!tableId || !defaultTableSorts[tableId]) return;
+  tableSorts[tableId] = { ...defaultTableSorts[tableId] };
+}
+
+function renderPlayerTable(tableId, rows, viewType = 'raw') {
   const table = document.getElementById(tableId);
-  const thead = table.querySelector('thead');
   const tbody = table.querySelector('tbody');
   const isCombined = combineFilter.value === 'combined';
-  const sorted = rows
-    .filter((row) => row[sortKey] !== null)
-    .slice()
-    .sort((a, b) => direction === 'desc' ? b[sortKey] - a[sortKey] : a[sortKey] - b[sortKey])
-    .slice(0, 25);
+  const columns = viewType === 'rate'
+    ? [
+        { key: 'season', label: 'Season', type: 'number' },
+        { key: 'player', label: 'Player', type: 'text' },
+        { key: 'team', label: 'Team', type: 'text' },
+        ...(isCombined ? [{ key: 'seasons_played', label: 'Matched Seasons', type: 'number' }] : []),
+        { key: 'reg_games', label: 'Reg GP', type: 'number' },
+        { key: 'po_games', label: 'PO GP', type: 'number' },
+        { key: 'reg_fta_rate', label: 'Reg FT Rate', type: 'number' },
+        { key: 'po_fta_rate', label: 'PO FT Rate', type: 'number' },
+        { key: 'fta_rate_change', label: 'FT Rate Delta', type: 'number' },
+      ]
+    : [
+        { key: 'season', label: 'Season', type: 'number' },
+        { key: 'player', label: 'Player', type: 'text' },
+        { key: 'team', label: 'Team', type: 'text' },
+        ...(isCombined ? [{ key: 'seasons_played', label: 'Matched Seasons', type: 'number' }] : []),
+        { key: 'reg_games', label: 'Reg GP', type: 'number' },
+        { key: 'po_games', label: 'PO GP', type: 'number' },
+        { key: 'reg_fta_per_g', label: 'Reg FTA/G', type: 'number' },
+        { key: 'po_fta_per_g', label: 'PO FTA/G', type: 'number' },
+        { key: 'fta_per_g_change', label: 'FTA/G Change', type: 'number' },
+      ];
+  const sorted = sortedRowsForTable(tableId, rows, columns).slice(0, 25);
 
-  thead.innerHTML = viewType === 'rate' ? `
-    <tr>
-      <th>Season</th>
-      <th>Player</th>
-      <th>Team</th>
-      ${isCombined ? '<th>Matched Seasons</th>' : ''}
-      <th>Reg GP</th>
-      <th>PO GP</th>
-      <th>Reg FT Rate</th>
-      <th>PO FT Rate</th>
-      <th>FT Rate Delta</th>
-    </tr>
-  ` : `
-    <tr>
-      <th>Season</th>
-      <th>Player</th>
-      <th>Team</th>
-      ${isCombined ? '<th>Matched Seasons</th>' : ''}
-      <th>Reg GP</th>
-      <th>PO GP</th>
-      <th>Reg FTA/G</th>
-      <th>PO FTA/G</th>
-      <th>FTA/G Change</th>
-    </tr>
-  `;
+  renderTableHead(table, tableId, columns);
 
   if (!sorted.length) {
-    tbody.innerHTML = viewType === 'rate'
-      ? `<tr><td colspan="${isCombined ? 10 : 9}">No playoff rows match the current filters.</td></tr>`
-      : `<tr><td colspan="${isCombined ? 9 : 8}">No playoff rows match the current filters.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${columns.length}">No playoff rows match the current filters.</td></tr>`;
     return;
   }
 
@@ -784,31 +857,25 @@ function renderPlayerTable(tableId, rows, sortKey, direction = 'desc', viewType 
 
 function renderTeamTable() {
   const table = document.getElementById('team-table');
-  const thead = table.querySelector('thead');
   const tbody = table.querySelector('tbody');
-  const rows = currentTeamRateRows()
-    .slice()
-    .sort((a, b) => teamSortDirection === 'desc'
-      ? (b.net_ft_rate_swing ?? -Infinity) - (a.net_ft_rate_swing ?? -Infinity)
-      : (a.net_ft_rate_swing ?? Infinity) - (b.net_ft_rate_swing ?? Infinity));
+  const columns = [
+    { key: 'season', label: 'Season', type: 'number' },
+    { key: 'team_abbr', label: 'Team', type: 'text' },
+    { key: 'playoff_games', label: 'PO Games', type: 'number' },
+    { key: 'reg_ft_rate', label: 'Reg Rate', type: 'number' },
+    { key: 'po_ft_rate', label: 'PO Rate', type: 'number' },
+    { key: 'ft_rate_change', label: 'Rate Swing', type: 'number' },
+    { key: 'reg_ft_rate_allowed', label: 'Reg Allowed', type: 'number' },
+    { key: 'po_ft_rate_allowed', label: 'PO Allowed', type: 'number' },
+    { key: 'ft_rate_allowed_change', label: 'Allowed Swing', type: 'number' },
+    { key: 'net_ft_rate_swing', label: 'Net Swing', type: 'number' },
+  ];
+  const rows = sortedRowsForTable('team-table', currentTeamRateRows(), columns);
 
-  thead.innerHTML = `
-    <tr>
-      <th>Season</th>
-      <th>Team</th>
-      <th>PO Games</th>
-      <th>Reg Rate</th>
-      <th>PO Rate</th>
-      <th>Rate Swing</th>
-      <th>Reg Allowed</th>
-      <th>PO Allowed</th>
-      <th>Allowed Swing</th>
-      <th><button class="sort-button" type="button" data-sort-table="teams">Net Swing</button></th>
-    </tr>
-  `;
+  renderTableHead(table, 'team-table', columns);
 
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="9">No team rows match the current filters.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10">No team rows match the current filters.</td></tr>';
     return;
   }
 
@@ -830,29 +897,23 @@ function renderTeamTable() {
 
 function renderRunsTable() {
   const table = document.getElementById('runs-table');
-  const thead = table.querySelector('thead');
   const tbody = table.querySelector('tbody');
-  const rows = currentRunRows()
-    .slice()
-    .sort((a, b) => runSortDirection === 'desc'
-      ? (b.net_ft_rate_edge ?? -Infinity) - (a.net_ft_rate_edge ?? -Infinity)
-      : (a.net_ft_rate_edge ?? Infinity) - (b.net_ft_rate_edge ?? Infinity));
+  const columns = [
+    { key: 'season', label: 'Season', type: 'number' },
+    { key: 'champion', label: 'Champion', type: 'text' },
+    { key: 'opponents', label: 'Opponents', type: 'text', value: (row) => formatOpponentPath(row.opponents) },
+    { key: 'playoff_games', label: 'Games', type: 'number' },
+    { key: 'team_reg_ft_rate', label: 'Team Reg Rate', type: 'number' },
+    { key: 'team_po_ft_rate', label: 'Team PO Rate', type: 'number' },
+    { key: 'team_ft_rate_change', label: 'Team Swing', type: 'number' },
+    { key: 'champion_reg_ft_rate_allowed', label: 'Champ Reg Allowed', type: 'number' },
+    { key: 'opp_po_ft_rate', label: 'Opp Rate vs Champ', type: 'number' },
+    { key: 'opp_matchup_swing', label: 'Opp Swing vs Champ', type: 'number' },
+    { key: 'net_ft_rate_edge', label: 'Net Swing', type: 'number' },
+  ];
+  const rows = sortedRowsForTable('runs-table', currentRunRows(), columns);
 
-  thead.innerHTML = `
-    <tr>
-      <th>Season</th>
-      <th>Champion</th>
-      <th>Opponents</th>
-      <th>Games</th>
-      <th>Team Reg Rate</th>
-      <th>Team PO Rate</th>
-      <th>Team Swing</th>
-      <th>Champ Reg Allowed</th>
-      <th>Opp Rate vs Champ</th>
-      <th>Opp Swing vs Champ</th>
-      <th><button class="sort-button" type="button" data-sort-table="runs">Net Swing</button></th>
-    </tr>
-  `;
+  renderTableHead(table, 'runs-table', columns);
 
   if (!rows.length) {
     tbody.innerHTML = '<tr><td colspan="11">No champion runs match the current filters.</td></tr>';
@@ -889,12 +950,14 @@ function showActiveTab() {
   const isPlayerTab = ['risers', 'droppers', 'risers-rate', 'droppers-rate'].includes(activeTab);
   const isTeamTab = activeTab === 'teams';
   const isRunTab = activeTab === 'runs';
-  const hideRankFilter = isCombined || !isPlayerTab;
+  const hideRankFilter = !isPlayerTab;
   const showPoGamesFilter = isPlayerTab || isTeamTab;
   const hideModeFilter = isRunTab;
   rankFilterWrap.hidden = hideRankFilter;
   rankFilter.disabled = hideRankFilter;
-  rankFilter.title = hideRankFilter ? 'Top N only applies to separate-season player tabs.' : '';
+  rankFilter.title = isCombined
+    ? 'Optional cutoff for player-seasons included before combining.'
+    : '';
   poGamesFilterWrap.hidden = !showPoGamesFilter;
   poGamesFilter.disabled = !showPoGamesFilter;
   searchFilterWrap.hidden = !isPlayerTab;
@@ -911,10 +974,10 @@ function rerender() {
   const rows = applyPostAggregationFilters(aggregateRows(activeRows()));
   renderExplanation();
   renderCards(rows);
-  renderPlayerTable('risers-table', rows, 'fta_per_g_change', 'desc', 'raw');
-  renderPlayerTable('droppers-table', rows, 'fta_per_g_change', 'asc', 'raw');
-  renderPlayerTable('risers-rate-table', rows, 'fta_rate_change', 'desc', 'rate');
-  renderPlayerTable('droppers-rate-table', rows, 'fta_rate_change', 'asc', 'rate');
+  renderPlayerTable('risers-table', rows, 'raw');
+  renderPlayerTable('droppers-table', rows, 'raw');
+  renderPlayerTable('risers-rate-table', rows, 'rate');
+  renderPlayerTable('droppers-rate-table', rows, 'rate');
   renderTeamTable();
   renderRunsTable();
   showActiveTab();
@@ -930,6 +993,14 @@ function setupFilters() {
   seasonStart.value = String(seasonYears[0]);
   seasonEnd.value = String(seasonYears[seasonYears.length - 1]);
 
+  combineFilter.addEventListener('change', () => {
+    if (combineFilter.value === 'combined') {
+      rankFilter.value = '';
+    } else if (!rankFilter.value) {
+      rankFilter.value = '1';
+    }
+  });
+
   [seasonStart, seasonEnd, teamFilter, rankFilter, poGamesFilter, searchFilter, combineFilter].forEach((element) => {
     element.addEventListener('input', rerender);
     element.addEventListener('change', rerender);
@@ -939,18 +1010,14 @@ function setupFilters() {
     const button = event.target.closest('.tab');
     if (!button) return;
     activeTab = button.dataset.tab;
+    resetTableSortForTab(activeTab);
     rerender();
   });
 
   document.addEventListener('click', (event) => {
     const button = event.target.closest('.sort-button');
     if (!button) return;
-    const tableName = button.dataset.sortTable;
-    if (tableName === 'teams') {
-      teamSortDirection = teamSortDirection === 'desc' ? 'asc' : 'desc';
-    } else if (tableName === 'runs') {
-      runSortDirection = runSortDirection === 'desc' ? 'asc' : 'desc';
-    }
+    setTableSort(button.dataset.sortTable, button.dataset.sortKey, button.dataset.sortType);
     rerender();
   });
 
