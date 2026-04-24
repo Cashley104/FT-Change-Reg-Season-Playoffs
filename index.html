@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>FT Playoff Change Dashboard</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <p class="eyebrow">NBA Playoffs</p>
+        <h1>Free Throw Change</h1>
+        <p class="subhead" id="hero-subhead">Compare regular-season free throw leaders to their playoff free throw volume, free throw rate, team FT profile, and champion run environment.</p>
+        <button class="explain-button" id="explain-toggle" type="button" aria-expanded="false" aria-controls="explain-panel">Stat Explained</button>
+        <section class="explain-panel" id="explain-panel" hidden>
+          <h2 id="explain-title">Stat Explained</h2>
+          <p id="explain-text-1"></p>
+          <p id="explain-text-2"></p>
+          <p class="explain-formula-label" id="explain-formula-label">Key Formula</p>
+          <p class="explain-formula" id="explain-formula"></p>
+        </section>
+      </section>
+
+      <section class="controls">
+        <label class="control compact">From
+          <input id="season-start" type="number" min="2000" max="2025" step="1" placeholder="2000">
+        </label>
+        <label class="control compact">To
+          <input id="season-end" type="number" min="2000" max="2025" step="1" placeholder="2025">
+        </label>
+        <label class="control">Team
+          <select id="team-filter"></select>
+        </label>
+        <label class="control compact" id="rank-filter-wrap">Top N
+          <select id="rank-filter">
+            <option value="1" selected>Top 1</option>
+            <option value="2">Top 2</option>
+            <option value="3">Top 3</option>
+            <option value="4">Top 4</option>
+            <option value="5">Top 5</option>
+          </select>
+        </label>
+        <label class="control compact">Min PO GP
+          <input id="po-games-filter" type="number" min="0" step="1" value="0">
+        </label>
+        <label class="control search-control">Search
+          <input id="search-filter" type="search" placeholder="Player name">
+        </label>
+        <label class="control mode-control">Season Mode
+          <select id="combine-filter">
+            <option value="separate" selected>Keep seasons separate</option>
+            <option value="combined">Combine selected span</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="status" id="status-banner" hidden>Loading dashboard data...</section>
+      <section class="cards" id="summary-cards"></section>
+
+      <section class="tab-strip" id="tab-strip" aria-label="Dashboard views">
+        <button class="tab is-active" data-tab="risers" type="button">FT Up</button>
+        <button class="tab" data-tab="droppers" type="button">FT Down</button>
+        <button class="tab" data-tab="risers-rate" type="button">Rate Up</button>
+        <button class="tab" data-tab="droppers-rate" type="button">Rate Down</button>
+        <button class="tab" data-tab="teams" type="button">Teams</button>
+        <button class="tab" data-tab="runs" type="button">Champions</button>
+      </section>
+
+      <section class="table-block tab-panel is-active" id="panel-risers">
+        <div class="table-header">
+          <h2>FT Up</h2>
+          <p>Players whose playoff free throws per game rose the most.</p>
+        </div>
+        <table id="risers-table">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <section class="table-block tab-panel" id="panel-droppers" hidden>
+        <div class="table-header">
+          <h2>FT Down</h2>
+          <p>Players whose playoff free throws per game fell the most.</p>
+        </div>
+        <table id="droppers-table">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <section class="table-block tab-panel" id="panel-risers-rate" hidden>
+        <div class="table-header">
+          <h2>Rate Up</h2>
+          <p>Players whose playoff free throw rate rose the most.</p>
+        </div>
+        <table id="risers-rate-table">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <section class="table-block tab-panel" id="panel-droppers-rate" hidden>
+        <div class="table-header">
+          <h2>Rate Down</h2>
+          <p>Players whose playoff free throw rate fell the most.</p>
+        </div>
+        <table id="droppers-rate-table">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <section class="table-block tab-panel" id="panel-teams" hidden>
+        <div class="table-header">
+          <h2>Team Summary</h2>
+          <p>Team-level playoff FT rate and FT rate allowed versus regular season.</p>
+        </div>
+        <table id="team-table">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <section class="table-block tab-panel" id="panel-runs" hidden>
+        <div class="table-header">
+          <h2>Champion Runs</h2>
+          <p>Champions only. Team swing compares a champion's playoff FT rate to its own regular season. Opponent swing compares playoff opponent FT rate against that champion to the champion's own regular-season FT rate allowed.</p>
+        </div>
+        <table id="runs-table">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <p class="source-note">Data source: Basketball Reference regular-season and playoff player tables. Season year is the ending year, so 2025 means 2024-25.</p>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>
