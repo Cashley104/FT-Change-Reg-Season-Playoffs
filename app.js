@@ -8,8 +8,11 @@ const teamFilter = document.getElementById('team-filter');
 const rankFilter = document.getElementById('rank-filter');
 const rankFilterWrap = document.getElementById('rank-filter-wrap');
 const poGamesFilter = document.getElementById('po-games-filter');
+const poGamesFilterWrap = document.getElementById('po-games-filter-wrap');
 const searchFilter = document.getElementById('search-filter');
+const searchFilterWrap = document.getElementById('search-filter-wrap');
 const combineFilter = document.getElementById('combine-filter');
+const modeFilterWrap = document.getElementById('mode-filter-wrap');
 const summaryCards = document.getElementById('summary-cards');
 const statusBanner = document.getElementById('status-banner');
 const controls = document.getElementById('controls');
@@ -882,11 +885,24 @@ function showActiveTab() {
   });
   const isCombined = combineFilter.value === 'combined';
   const isPlayerTab = ['risers', 'droppers', 'risers-rate', 'droppers-rate'].includes(activeTab);
+  const isTeamTab = activeTab === 'teams';
+  const isRunTab = activeTab === 'runs';
   const hideRankFilter = isCombined || !isPlayerTab;
+  const hidePlayerFilters = !isPlayerTab;
+  const hideModeFilter = isRunTab;
   rankFilterWrap.hidden = hideRankFilter;
   rankFilter.disabled = hideRankFilter;
   rankFilter.title = hideRankFilter ? 'Top N only applies to separate-season player tabs.' : '';
+  poGamesFilterWrap.hidden = hidePlayerFilters;
+  poGamesFilter.disabled = hidePlayerFilters;
+  searchFilterWrap.hidden = hidePlayerFilters;
+  searchFilter.disabled = hidePlayerFilters;
+  modeFilterWrap.hidden = hideModeFilter;
+  combineFilter.disabled = hideModeFilter;
   controls.classList.toggle('is-rank-hidden', hideRankFilter);
+  controls.classList.toggle('is-player-tab', isPlayerTab);
+  controls.classList.toggle('is-team-tab', isTeamTab);
+  controls.classList.toggle('is-run-tab', isRunTab);
 }
 
 function rerender() {

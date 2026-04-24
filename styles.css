@@ -122,6 +122,14 @@ h1 {
   grid-template-columns: 92px 92px 120px 104px minmax(300px, 1fr) 190px;
 }
 
+.controls.is-team-tab {
+  grid-template-columns: 92px 92px minmax(260px, 1fr) 220px;
+}
+
+.controls.is-run-tab {
+  grid-template-columns: 92px 92px minmax(320px, 1fr);
+}
+
 .control {
   display: grid;
   gap: 8px;
@@ -318,7 +326,12 @@ th {
 }
 
 @media (max-width: 700px) {
-  .controls { grid-template-columns: 1fr 1fr; }
+  .controls,
+  .controls.is-rank-hidden,
+  .controls.is-team-tab,
+  .controls.is-run-tab {
+    grid-template-columns: 1fr 1fr;
+  }
   .cards { grid-template-columns: 1fr 1fr; }
   .page { padding: 24px 14px 40px; }
   table { min-width: 820px; }
